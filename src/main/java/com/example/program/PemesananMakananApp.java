@@ -9,20 +9,37 @@ import javafx.scene.layout.*;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.scene.text.Font;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Alert.AlertType;
 
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.*;
 
+/**
+ * Kelas utama aplikasi yang meluncurkan aplikasi JavaFX dan menginisialisasi manajer menu.
+ */
 public class PemesananMakananApp extends Application {
     private static final int WINDOW_WIDTH = 830;
     private static final int WINDOW_HEIGHT = 600;
+    private static final int MAX_NAME_LENGTH = 10;
+    private static final double MAX_PAYMENT_AMOUNT = 1000000.0;
 
+    /**
+     * Metode utama yang dipanggil saat aplikasi diluncurkan.
+     *
+     * @param args Argumen baris perintah.
+     */
     public static void main(String[] args) {
         launch(args);
     }
 
+    /**
+     * Metode yang dipanggil saat aplikasi diinisialisasi. Membuat objek MenuManager dan menampilkan antarmuka pengguna.
+     *
+     * @param primaryStage Objek Stage utama aplikasi.
+     */
     @Override
     public void start(Stage primaryStage) {
         MenuManager menuManager = new MenuManager(primaryStage);
@@ -36,6 +53,9 @@ public class PemesananMakananApp extends Application {
         primaryStage.show();
     }
 
+    /**
+     * Kelas MenuManager mengelola menu, pesanan, dan antarmuka pengguna aplikasi.
+     */
     public static class MenuManager {
         private final Stage primaryStage;
         private final Order order;
@@ -45,6 +65,7 @@ public class PemesananMakananApp extends Application {
         private final TextArea orderDetailsTextArea;
         private final Label priceLabel;
         private final TextField customerNameField;
+        private static final int MAX_QUANTITY_PER_ITEM = 10;
         private int currentQuantity = 1; // Variabel untuk menyimpan jumlah pesanan saat ini
 
 
@@ -60,6 +81,9 @@ public class PemesananMakananApp extends Application {
             this.paymentField = new TextField();
         }
 
+        /**
+         * Menginisialisasi aplikasi dengan membuat tata letak dan menampilkan menu.
+         */
         public void init() {
             BorderPane root = createLayout();
             Scene scene = new Scene(root, WINDOW_WIDTH, WINDOW_HEIGHT);
@@ -71,6 +95,11 @@ public class PemesananMakananApp extends Application {
             displayMenu();
         }
 
+        /**
+         * Membuat tata letak utama aplikasi menggunakan BorderPane.
+         *
+         * @return Tata letak utama aplikasi.
+         */
         public BorderPane createLayout() {
             BorderPane root = new BorderPane();
             root.setPadding(new Insets(10));
@@ -87,23 +116,6 @@ public class PemesananMakananApp extends Application {
 
             return root;
         }
-        private void payOrder() {
-            String paymentText = paymentField.getText();
-            try {
-                double paymentAmount = Double.parseDouble(paymentText);
-
-                // Validasi: Uang yang dimasukkan tidak boleh lebih dari 100000
-                if (paymentAmount > 100000) {
-                    System.out.println("Maaf, uang yang dimasukkan tidak boleh lebih dari 100000.");
-                    return;
-                }
-
-                reduceTotalFromPayment(paymentAmount);
-            } catch (NumberFormatException ex) {
-                System.out.println("Masukkan jumlah uang yang valid.");
-            }
-        }
-
         private void saveOrderToFile() {
             String enteredName = customerNameField.getText().trim();
             if (isNameValid(enteredName)) {
@@ -228,14 +240,22 @@ public class PemesananMakananApp extends Application {
 
             customerNameField.setPromptText("Nama Pemesan");
             customerNameField.textProperty().addListener((observable, oldValue, newValue) -> {
-                // Tidak ada lagi batasan 10 karakter pada nama pemesan
+                // Batasan karakter pada nama pemesan menjadi maksimal 10
+                if (newValue.length() > MAX_NAME_LENGTH) {
+                    customerNameField.setText(oldValue);
+                    displayWarning("Nama pemesan tidak boleh lebih dari 10 karakter.");
+                }
             });
 
             // Menambahkan event handler untuk tombol Enter
             customerNameField.setOnAction(event -> {
                 String enteredName = customerNameField.getText().trim();
-                order.setCustomerName(enteredName);
-                saveOrderToFile(); // Panggil method untuk menyimpan ke file
+                if (isNameValid(enteredName)) {
+                    order.setCustomerName(enteredName);
+                    saveOrderToFile(); // Panggil method untuk menyimpan ke file
+                } else {
+                    displayWarning("Nama pemesan tidak boleh mengandung angka.");
+                }
             });
 
             topBox.getChildren().addAll(categoryComboBox, customerNameField);
@@ -249,9 +269,14 @@ public class PemesananMakananApp extends Application {
 
             displayListView.setPrefHeight(200);
             centerBox.getChildren().addAll(displayListView);
+
             Button removeButton = new Button("Hapus Pesanan");
             removeButton.setOnAction(e -> removeOrder());
             centerBox.getChildren().add(removeButton);
+
+            Button clearButton = new Button("Clear");
+            clearButton.setOnAction(e -> clearOrder());
+            centerBox.getChildren().add(clearButton);
 
             Button orderButton = new Button("Pesan");
             orderButton.setOnAction(e -> {
@@ -270,6 +295,11 @@ public class PemesananMakananApp extends Application {
             centerBox.getChildren().add(orderButton);
 
             return centerBox;
+        }
+
+        private void clearOrder() {
+            order.getItems().clear();
+            updateOrderDetails();
         }
 
         private HBox createBottomBox() {
@@ -307,14 +337,21 @@ public class PemesananMakananApp extends Application {
                 String paymentText = paymentField.getText();
                 try {
                     double paymentAmount = Double.parseDouble(paymentText);
+
+                    // Validasi: Jumlah uang tidak boleh lebih dari 100.000
+                    if (paymentAmount > MAX_PAYMENT_AMOUNT) {
+                        displayWarning("Jumlah uang tidak boleh lebih dari 100.000.000");
+                        return;
+                    }
+
                     reduceTotalFromPayment(paymentAmount);
                 } catch (NumberFormatException ex) {
-
+                    displayWarning("Masukkan jumlah uang yang valid.");
                 }
 
             });
-
-
+            Button openReceiptButton = new Button("Buka Struk");
+            openReceiptButton.setOnAction(e -> openReceiptFromFile());
 
             HBox buttonBox = new HBox(10);
             buttonBox.setAlignment(Pos.CENTER); // Menempatkan tombol-tombol ke tengah
@@ -325,9 +362,50 @@ public class PemesananMakananApp extends Application {
             Button printToFileButton = new Button("Cetak Struk ke File");
             printToFileButton.setOnAction(e -> printReceiptToFile());
 
-            buttonBox.getChildren().addAll(printButton, printToFileButton);
+            buttonBox.getChildren().addAll(printButton, printToFileButton, openReceiptButton);
             rightBox.getChildren().addAll(orderDetailsTextArea, priceLabel, paymentField, payButton, buttonBox);
             return rightBox;
+        }
+
+        /**
+         * Membuka struk dari file dan menampilkannya di area rincian pesanan.
+         */
+        private void openReceiptFromFile() {
+            FileChooser fileChooser = new FileChooser();
+            fileChooser.setTitle("Buka Struk dari File");
+            fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Text Files", "*.txt"));
+            File file = fileChooser.showOpenDialog(primaryStage);
+
+            if (file != null) {
+                try {
+                    Scanner scanner = new Scanner(file);
+                    StringBuilder receiptContent = new StringBuilder();
+
+                    while (scanner.hasNext()) {
+                        receiptContent.append(scanner.nextLine()).append("\n");
+                    }
+
+                    orderDetailsTextArea.setText(receiptContent.toString());
+                    displayInfo("Struk berhasil dibuka dari file: " + file.getAbsolutePath());
+
+                    scanner.close();
+                } catch (IOException e) {
+                    displayWarning("Gagal membuka file struk.");
+                }
+            }
+        }
+
+        /**
+         * Menampilkan peringatan informasi dengan pesan yang diberikan.
+         *
+         * @param message Pesan yang akan ditampilkan dalam peringatan.
+         */
+        private void displayInfo(String message) {
+            Alert alert = new Alert(AlertType.INFORMATION);
+            alert.setTitle("Informasi");
+            alert.setHeaderText(null);
+            alert.setContentText(message);
+            alert.showAndWait();
         }
         private void reduceTotalFromPayment(double paymentAmount) {
             double totalPrice = calculateTotalPrice();
@@ -357,12 +435,6 @@ public class PemesananMakananApp extends Application {
             return totalPrice;
         }
 
-        private void resetOrderDetails() {
-            order.getItems().clear();
-            updateOrderDetails();
-        }
-
-
 
         private void updateOrderDetails() {
             StringBuilder orderDetails = new StringBuilder("Pesanan:\n");
@@ -381,8 +453,20 @@ public class PemesananMakananApp extends Application {
         }
 
         private void addToOrder(Menu selectedMenu, int quantity) {
-            order.addItem(selectedMenu, quantity);
-            updateOrderDetails();
+            if (quantity > 0 && quantity <= MAX_QUANTITY_PER_ITEM) {
+                order.addItem(selectedMenu, quantity);
+                updateOrderDetails();
+            } else {
+                displayWarning("Jumlah pesanan per item maksimal adalah " + MAX_QUANTITY_PER_ITEM);
+            }
+        }
+
+        private void displayWarning(String message) {
+            Alert alert = new Alert(AlertType.WARNING);
+            alert.setTitle("Peringatan");
+            alert.setHeaderText(null);
+            alert.setContentText(message);
+            alert.showAndWait();
         }
 
         private void displayCategory(String categoryName) {
@@ -476,6 +560,9 @@ public class PemesananMakananApp extends Application {
         }
     }
 
+    /**
+     * Kelas Order mewakili pesanan pelanggan, termasuk item-menu yang dipilih dan nama pelanggan.
+     */
     public static class Order {
         private final Map<Menu, Integer> items;
         private String customerName;
@@ -503,12 +590,18 @@ public class PemesananMakananApp extends Application {
         }
     }
 
+    /**
+     * Antarmuka Menu mendefinisikan struktur item menu dengan nama dan harga.
+     */
     public interface Menu {
         String getName();
 
         double getPrice();
     }
 
+    /**
+     * Kelas Category mewakili kategori menu yang berisi daftar item menu.
+     */
     public static class Category {
         private final String name;
         private final List<Menu> items;
@@ -533,6 +626,9 @@ public class PemesananMakananApp extends Application {
         }
     }
 
+    /**
+     * Kelas MenuItem mewakili item menu spesifik dengan nama dan harga.
+     */
     public static class MenuItem implements Menu {
         private final String name;
         private final double price;

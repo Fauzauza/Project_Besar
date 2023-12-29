@@ -420,7 +420,7 @@ public class PemesananMakananApp extends Application {
                 // Reset pesanan
 
             } else {
-                System.out.println("Pembayaran tidak mencukupi.");
+                displayWarning("Pembayaran tidak mencukupi. Jumlah uang yang dimasukkan kurang dari total harga.");
             }
         }
 
